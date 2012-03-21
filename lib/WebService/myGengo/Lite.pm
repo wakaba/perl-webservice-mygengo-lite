@@ -22,9 +22,9 @@ sub is_production {
 sub base_url {
     my $self = shift;
     if ($self->is_production) {
-        return q<http://api.mygengo.com/v1/>;
+        return q<http://api.mygengo.com/v1.1/>;
     } else {
-        return q<http://api.sandbox.mygengo.com/v1/>;
+        return q<http://api.sandbox.mygengo.com/v1.1/>;
     }
 }
 
@@ -46,15 +46,17 @@ sub request {
     my ($self, %args) = @_;
     
     my $data = $args{data} || {};
+    my $time = time;
+
     my $params = {
         api_key => $self->api_key,
         data => perl2json_bytes($data),
-        ts => time,
+        ts => $time,
     };
     my $qs = join '&', map {
         (percent_encode_c $_ ) . '=' . (percent_encode_c $params->{$_});
     } sort { $a cmp $b } keys %$params;
-    $qs .= '&api_sig=' . hmac_sha1_hex $qs, $self->private_key;
+    $qs .= '&api_sig=' . hmac_sha1_hex $time, $self->private_key;
 
     if ($args{method} and $args{method} eq 'POST') {
         my ($req, $res) = http_post_data
@@ -64,14 +66,14 @@ sub request {
                 'Content-Type' => 'application/x-www-form-urlencoded',
             },
             content => $qs;
-        return WebService::myGengo::Lite::Response->new_from_lwp_res($res)
+        return WebService::myGengo::Lite::Response->new_from_lwp_res($res);
     } else {
         my ($req, $res) = http_get
             url => $self->base_url . $args{path} . q<?> . $qs,
             header_fields => {
                 'Accept' => 'application/json',
             };
-        return WebService::myGengo::Lite::Response->new_from_lwp_res($res)
+        return WebService::myGengo::Lite::Response->new_from_lwp_res($res);
     }
 }
 
