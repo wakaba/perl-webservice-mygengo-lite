@@ -94,10 +94,77 @@ sub account_stats {
     );
 }
 
+# source => {body => ..., lang => ...},
+# target => {lang => ...},
+# tier => "machine", "standard", "pro", "ultra",
+# force => boolean,
+# comment => ...,
+# use_preferred => ...,
+# callback_url => ...,
+# auto_approve => ...,
+# custom_data => ...,
+sub create_job_request ($%) {
+  shift;
+  return bless {@_}, 'WebService::myGengo::Lite::Job';
+} # create_job_request
+
+## <http://mygengo.com/api/developer-docs/methods/translate-jobs-get/>.
+sub jobs_get {
+  my ($self, %args) = @_;
+  return $self->request
+      (method => 'GET',
+       path => q<translate/jobs>,
+       data => {
+         status => $args{status},
+         timestamp_after => $args{timestamp_after},
+         count => $args{count},
+       });
+} # jobs_get
+
+## <http://mygengo.com/api/developer-docs/methods/translate-jobs-post/>.
+sub jobs_post {
+  my ($self, $jobs, %args) = @_;
+  return $self->request
+      (method => 'POST',
+       path => q<translate/jobs>,
+       data => {
+         jobs => [map { $_->as_jsonable } @$jobs],
+         as_group => $args{as_group} || 0,
+       });
+} # jobs_post
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-get/>.
+sub job_get ($$%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (method => 'GET',
+       path => q<translate/job/> . $job_id,
+       data => {
+         pre_mt => $args{pre_mt},
+       });
+}
+
+package WebService::myGengo::Lite::Job;
+
+## <http://mygengo.com/api/developer-docs/payloads/>.
+
+sub as_jsonable ($) {
+  my $self = shift;
+  my $json = {
+    %$self,
+    body_src => $self->{source}->{body},
+    lc_src => $self->{source}->{lang},
+    lc_tgt => $self->{target}->{lang},
+  };
+  delete $json->{source};
+  delete $json->{target};
+  return $json;
+} # as_jsonable
+
 package WebService::myGengo::Lite::Response;
 use JSON::Functions::XS qw(json_bytes2perl);
 
-sub new_from_lwp_res {
+sub new_from_lwp_res ($$) {
     my ($class, $res) = @_;
 
     my $result = {};
@@ -106,7 +173,8 @@ sub new_from_lwp_res {
         my $json = json_bytes2perl $res->content;
         if (ref $json eq 'HASH') {
             if ($json->{opstat} eq 'ok') {
-                if (ref $json->{response} eq 'HASH') {
+                if (ref $json->{response} eq 'HASH' or
+                    ref $json->{response} eq 'ARRAY') {
                     $result->{data} = $json->{response};
                 } else {
                     $result->{is_error} = 1;
@@ -134,6 +202,14 @@ sub new_from_lwp_res {
 
 sub data {
     return $_[0]->{data};
+}
+
+sub job {
+    if ($_[0]->{data} and ref $_[0]->{data} eq 'HASH' and
+        $_[0]->{data}->{job} and ref $_[0]->{data}->{job} eq 'HASH') {
+        return bless {%{$_[0]->{data}->{job}}}, 'WebService::myGengo::Lite::Job';
+    }
+    return undef;
 }
 
 sub is_error {
