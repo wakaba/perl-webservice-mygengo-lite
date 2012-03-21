@@ -19,12 +19,14 @@ sub is_production {
     return $_[0]->{is_production};
 }
 
+our $APIVersion = '1.1';
+
 sub base_url {
     my $self = shift;
     if ($self->is_production) {
-        return q<http://api.mygengo.com/v1.1/>;
+        return qq<http://api.mygengo.com/v$APIVersion/>;
     } else {
-        return q<http://api.sandbox.mygengo.com/v1.1/>;
+        return qq<http://api.sandbox.mygengo.com/v$APIVersion/>;
     }
 }
 
@@ -56,7 +58,12 @@ sub request {
     my $qs = join '&', map {
         (percent_encode_c $_ ) . '=' . (percent_encode_c $params->{$_});
     } sort { $a cmp $b } keys %$params;
-    $qs .= '&api_sig=' . hmac_sha1_hex $time, $self->private_key;
+    if ($APIVersion eq '1') {
+      ## Does not work for POST...
+      $qs .= '&api_sig=' . hmac_sha1_hex $qs, $self->private_key;
+    } else { # 1.1
+      $qs .= '&api_sig=' . hmac_sha1_hex $time, $self->private_key;
+    }
 
     if ($args{method} and $args{method} eq 'POST') {
         my ($req, $res) = http_post_data
