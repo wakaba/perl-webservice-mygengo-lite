@@ -56,12 +56,23 @@ sub request {
     } sort { $a cmp $b } keys %$params;
     $qs .= '&api_sig=' . hmac_sha1_hex $qs, $self->private_key;
 
-    my ($req, $res) = http_get
-        url => $self->base_url . $args{path} . q<?> . $qs,
-        header_fields => {
-            'Accept' => 'application/json',
-        };
-    return WebService::myGengo::Lite::Response->new_from_lwp_res($res)
+    if ($args{method} and $args{method} eq 'POST') {
+        my ($req, $res) = http_post_data
+            url => $self->base_url . $args{path},
+            header_fields => {
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            },
+            content => $qs;
+        return WebService::myGengo::Lite::Response->new_from_lwp_res($res)
+    } else {
+        my ($req, $res) = http_get
+            url => $self->base_url . $args{path} . q<?> . $qs,
+            header_fields => {
+                'Accept' => 'application/json',
+            };
+        return WebService::myGengo::Lite::Response->new_from_lwp_res($res)
+    }
 }
 
 # $res->data->{credits}
