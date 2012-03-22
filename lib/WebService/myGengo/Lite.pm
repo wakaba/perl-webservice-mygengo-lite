@@ -47,7 +47,11 @@ sub private_key {
 sub request {
     my ($self, %args) = @_;
     
-    my $data = $args{data} || {};
+    my $data = {%{$args{data} or {}}};
+    $data = {map { $_ => $data->{$_} }
+             grep { defined $data->{$_} }
+             keys %$data};
+
     my $time = time;
 
     my $params = {
@@ -161,18 +165,50 @@ sub job_post {
        });
 } # job_post
 
-## <http://mygengo.com/api/developer-docs/methods/translate-jobs-get/>.
-sub job_list {
-  my ($self, %args) = @_;
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-put/>.
+sub job_revise ($$%) {
+  my ($self, $job_id, %args) = @_;
   return $self->request
-      (method => 'GET',
-       path => q<translate/jobs>,
+      (method => 'POST',
+       path => q<translate/job/> . $job_id,
        data => {
-         status => $args{status},
-         timestamp_after => $args{timestamp_after},
-         count => $args{count},
+           _method => 'put',
+           action => 'revise',
+           comment => $args{comment_to_translator},
        });
-} # job_list
+}
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-put/>.
+sub job_approve ($$%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (method => 'POST',
+       path => q<translate/job/> . $job_id,
+       data => {
+           _method => 'put',
+           action => 'approve',
+           rating => $args{rating},
+           for_translator => $args{comment_for_translator},
+           for_mygengo => $args{comment_for_mygengo},
+           public => $args{comment_is_public},
+       });
+}
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-put/>.
+sub job_reject ($$%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (method => 'POST',
+       path => q<translate/job/> . $job_id,
+       data => {
+           _method => 'put',
+           action => 'reject',
+           reason => $args{reason}, # "quality", "incomplete", "other"
+           comment => $args{comment_for_translator},
+           captcha => $args{captcha},
+           follow_up => $args{follow_up}, # requeue / cancel
+       });
+}
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-get/>.
 sub job_get ($$%) {
@@ -214,6 +250,27 @@ sub job_preview ($$%) {
         (method => 'GET',
          path => q<translate/job/> . $job_id . q</preview>);
 }
+
+## <http://mygengo.com/api/developer-docs/methods/translate-jobs-get/>.
+sub job_list {
+  my ($self, %args) = @_;
+  return $self->request
+      (method => 'GET',
+       path => q<translate/jobs>,
+       data => {
+         status => $args{status},
+         timestamp_after => $args{timestamp_after},
+         count => $args{count},
+       });
+} # job_list
+
+## <http://mygengo.com/api/developer-docs/methods/translate-jobs-group-get/>.
+sub job_group {
+  my ($self, $job_group_id, %args) = @_;
+  return $self->request
+      (method => 'GET',
+       path => q<translate/jobs/group/> . $job_group_id);
+} # job_group
 
 package WebService::myGengo::Lite::Job;
 
@@ -343,6 +400,22 @@ sub error_message {
 
 sub error_details {
     return $_[0]->{error_details};
+}
+
+sub error_capcha_image_url {
+    #{"opstat":"error","err":{"code":2401,"msg":["invalid captcha challenge","http:\/\/sandbox.mygengo.com\/captcha\/?key=67c98a5f8a69aee9af15d4170cd7b447e778cd4d07e168176da6053778d3c4d2"]}}
+    my $self = shift;
+    if ($self->is_error and
+        $self->{error_details}->{err} and
+        ref $self->{error_details}->{err} eq 'HASH' and
+        $self->{error_details}->{err}->{code} == 2401) {
+        if ($self->{error_details}->{err}->{msg} and
+            ref $self->{error_details}->{err}->{msg} eq 'ARRAY' and
+            @{$self->{error_details}->{err}->{msg}} == 2) {
+            return $self->{error_details}->{err}->{msg}->[1];
+        }
+    }
+    return undef;
 }
 
 1;
