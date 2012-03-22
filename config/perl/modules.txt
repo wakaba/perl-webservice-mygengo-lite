@@ -1,0 +1,4 @@
+Digest::SHA
+Encode
+Test::Class
+Test::More
