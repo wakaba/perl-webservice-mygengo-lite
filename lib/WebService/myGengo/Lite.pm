@@ -152,6 +152,14 @@ sub job_get ($$%) {
        });
 }
 
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-preview-get/>.
+sub job_preview ($$%) {
+    my ($self, $job_id, %args) = @_;
+    return $self->request
+        (method => 'GET',
+         path => q<translate/job/> . $job_id . q</preview>);
+}
+
 package WebService::myGengo::Lite::Job;
 
 ## <http://mygengo.com/api/developer-docs/payloads/>.
@@ -171,6 +179,7 @@ sub as_jsonable ($) {
 
 package WebService::myGengo::Lite::Response;
 use JSON::Functions::XS qw(json_bytes2perl);
+use MIME::Base64;
 
 sub new_from_lwp_res ($$) {
     my ($class, $res) = @_;
@@ -178,26 +187,35 @@ sub new_from_lwp_res ($$) {
     my $result = {};
     
     if ($res->is_success) {
-        my $json = json_bytes2perl $res->content;
-        if (ref $json eq 'HASH') {
-            if ($json->{opstat} eq 'ok') {
-                if (ref $json->{response} eq 'HASH' or
-                    ref $json->{response} eq 'ARRAY') {
-                    $result->{data} = $json->{response};
+        my $ct = $res->content_type;
+        if ($ct =~ m{application/json}) {
+            my $json = json_bytes2perl $res->content;
+            if (ref $json eq 'HASH') {
+                if ($json->{opstat} eq 'ok') {
+                    if (ref $json->{response} eq 'HASH' or
+                        ref $json->{response} eq 'ARRAY') {
+                        $result->{data} = $json->{response};
+                    } else {
+                        $result->{is_error} = 1;
+                        $result->{error_message} = 'Unsupported response';
+                        $result->{error_details} = $json;
+                    }
                 } else {
                     $result->{is_error} = 1;
-                    $result->{error_message} = 'Unsupported response';
+                    $result->{error_message} = $json->{opstat};
                     $result->{error_details} = $json;
                 }
             } else {
                 $result->{is_error} = 1;
-                $result->{error_message} = $json->{opstat};
+                $result->{error_message} = 'Unsupported response';
                 $result->{error_details} = $json;
             }
+        } elsif ($ct =~ m{image/jpeg}) {
+            $result->{jpeg_data} = $res->content;
         } else {
             $result->{is_error} = 1;
-            $result->{error_message} = 'Unsupported response';
-            $result->{error_details} = $json;
+            $result->{error_message} = 'Unsupported MIME type';
+            $result->{error_details} = $ct;
         }
     } else {
         $result->{is_error} = 1;
@@ -216,6 +234,16 @@ sub job {
     if ($_[0]->{data} and ref $_[0]->{data} eq 'HASH' and
         $_[0]->{data}->{job} and ref $_[0]->{data}->{job} eq 'HASH') {
         return bless {%{$_[0]->{data}->{job}}}, 'WebService::myGengo::Lite::Job';
+    }
+    return undef;
+}
+
+sub image_as_data_url {
+    my $self = shift;
+    if ($self->{jpeg_data}) {
+        my $mime = encode_base64 $self->{jpeg_data};
+        $mime =~ s/\s+//g;
+        return 'data:image/jpeg;base64,' . $mime;
     }
     return undef;
 }
