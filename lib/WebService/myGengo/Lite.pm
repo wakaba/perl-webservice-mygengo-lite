@@ -74,15 +74,48 @@ sub request {
                 'Content-Type' => 'application/x-www-form-urlencoded',
             },
             content => $qs;
-        return WebService::myGengo::Lite::Response->new_from_lwp_res($res);
+        return WebService::myGengo::Lite::Response->new_from_lwp_res(
+            $res,
+            job_data_key => $args{job_data_key},
+            input_jobs => $args{input_jobs},
+        );
     } else {
         my ($req, $res) = http_get
             url => $self->base_url . $args{path} . q<?> . $qs,
             header_fields => {
                 'Accept' => 'application/json',
             };
-        return WebService::myGengo::Lite::Response->new_from_lwp_res($res);
+        return WebService::myGengo::Lite::Response->new_from_lwp_res(
+            $res,
+            job_data_key => $args{job_data_key},
+            input_jobs => $args{input_jobs},
+        );
     }
+}
+
+## <http://mygengo.com/api/developer-docs/methods/translate-service-languages-get/>.
+#
+# $res->data = [{lc => langtag, language => ..., localized_name => ...,
+#                unit_type => ...}]
+sub service_languages {
+    my ($self, %args) = @_;
+    return $self->request(
+        path => q<translate/service/languages>,
+    );
+}
+
+## <http://mygengo.com/api/developer-docs/methods/translate-service-language-pairs-get/>.
+#
+# $res->data = [{lc_src => langtag, lc_tgt => langtag,
+#                unit_price => ..., tier => ...}]
+sub service_language_pairs {
+    my ($self, %args) = @_;
+    return $self->request(
+        path => q<translate/service/language_pairs>,
+        data => {
+            lc_src => $args{source_lang},
+        },
+    );
 }
 
 # $res->data->{credits}
@@ -141,6 +174,20 @@ sub jobs_post {
        });
 } # jobs_post
 
+## <http://mygengo.com/api/developer-docs/methods/translate-service-quote-post/>.
+sub quote {
+    my ($self, $jobs, %args) = @_;
+    return $self->request
+        (method => 'POST',
+         path => q<translate/service/quote>,
+         data => {
+             jobs => [map { $_->as_jsonable } @$jobs],
+         },
+         job_data_key => 'quote',
+         input_jobs => $jobs);
+    # {jobs => [{eta => ..., credits => ..., unit_count => ...}]}
+} # quote
+
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-get/>.
 sub job_get ($$%) {
   my ($self, $job_id, %args) = @_;
@@ -181,8 +228,8 @@ package WebService::myGengo::Lite::Response;
 use JSON::Functions::XS qw(json_bytes2perl);
 use MIME::Base64;
 
-sub new_from_lwp_res ($$) {
-    my ($class, $res) = @_;
+sub new_from_lwp_res ($$;%) {
+    my ($class, $res, %args) = @_;
 
     my $result = {};
     
@@ -222,12 +269,27 @@ sub new_from_lwp_res ($$) {
         $result->{error_message} = $res->status_line;
         $result->{error_details} = $res->content;
     }
+
+    if (not $result->{is_error} and
+        $args{job_data_key} and
+        $args{input_jobs} and
+        $result->{data} and ref $result->{data} eq 'HASH' and
+        $result->{data}->{jobs} and ref $result->{data}->{jobs} eq 'ARRAY') {
+        for (0..$#{$args{input_jobs}}) {
+            $args{input_jobs}->[$_]->{$args{job_data_key}} = $result->{data}->{jobs}->[$_];
+        }
+        $result->{jobs} = $args{input_jobs};
+    }
     
     return bless $result, $class;
 }
 
 sub data {
     return $_[0]->{data};
+}
+
+sub jobs {
+    return $_[0]->{jobs};
 }
 
 sub job {
