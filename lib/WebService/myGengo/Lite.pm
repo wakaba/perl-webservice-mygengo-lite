@@ -20,6 +20,7 @@ sub is_production {
 }
 
 our $APIVersion = '1.1';
+our $APITimeout = 60;
 
 sub base_url {
     my $self = shift;
@@ -74,6 +75,7 @@ sub request {
     if ($method eq 'POST' or $method eq 'PUT') {
         my ($req, $res) = http_post_data
             url => $self->base_url . $args{path},
+            timeout => $APITimeout,
             override_method => $method,
             header_fields => {
                 'Accept' => 'application/json',
@@ -88,6 +90,7 @@ sub request {
     } else {
         my ($req, $res) = http_get
             url => $self->base_url . $args{path} . q<?> . $qs,
+            timeout => $APITimeout,
             override_method => $method,
             header_fields => {
                 'Accept' => 'application/json',
@@ -125,6 +128,8 @@ sub service_lang_pairs {
     );
 }
 
+## <http://mygengo.com/api/developer-docs/methods/account-balance-get/>.
+#
 # $res->data->{credits}
 sub account_balance {
     my ($self, %args) = @_;
@@ -133,6 +138,8 @@ sub account_balance {
     );
 }
 
+## <http://mygengo.com/api/developer-docs/methods/account-stats-get/>.
+#
 # $res->data->{user_since} time_t
 # $res->data->{credits_spent}
 sub account_stats {
@@ -238,7 +245,9 @@ sub jobs_get ($$%) {
 }
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-service-quote-post/>.
-sub quote {
+#
+# $res->data = {jobs => [{eta => ..., credits => ..., unit_count => ...}]}
+sub job_quote {
     my ($self, $jobs, %args) = @_;
     return $self->request
         (method => 'POST',
@@ -248,16 +257,65 @@ sub quote {
          },
          job_data_key => 'quote',
          input_jobs => $jobs);
-    # {jobs => [{eta => ..., credits => ..., unit_count => ...}]}
-} # quote
+} # job_quote
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-comments-get/>.
+#
+# $res->data = {threads = [{ctime => time, body => ...,
+#                           author => "translator"/"customer"/"worker"/
+#                                     "senior translator"}, ...]}
+sub job_comments {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (path => q<translate/job/> . $job_id . q</comments>);
+} # job_comments
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-comment-post/>.
+#
+# $res->data = {}
+sub job_comment_post ($$%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request 
+      (method => 'POST',
+       path => q<translate/job/> . $job_id . q</comment>,
+       data => {
+         body => $args{comment_for_translator},
+       });
+} # job_comment_post
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-feedback-get/>.
+#
+# $res->data = {for_translator => ..., rating => ...}
+sub job_feedback ($$;%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (path => q<translate/job/> . $job_id . q</feedback>);
+} # job_feedback
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-preview-get/>.
 sub job_preview ($$%) {
-    my ($self, $job_id, %args) = @_;
-    return $self->request
-        (method => 'GET',
-         path => q<translate/job/> . $job_id . q</preview>);
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (path => q<translate/job/> . $job_id . q</preview>);
 }
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-revisions-get/>.
+#
+# $res->data = {revisions => [{ctime => time, rev_id => ...}, ...]}
+sub job_revision_list ($$;%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (path => q<translate/job/> . $job_id . q</revisions>);
+} # job_revision_list
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-revision-rev-id-get/>.
+#
+# $res->data = {revision => {ctime => time, body_tgt => ...}}
+sub job_revision ($$$;%) {
+  my ($self, $job_id, $rev_id, %args) = @_;
+  return $self->request
+      (path => q<translate/job/> . $job_id . q</revision/> . $rev_id);
+} # job_revision
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-jobs-get/>.
 sub job_list {
