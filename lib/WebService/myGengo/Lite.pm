@@ -46,6 +46,7 @@ sub private_key {
 
 sub request {
     my ($self, %args) = @_;
+    my $method = $args{method} || 'GET';
     
     my $data = {%{$args{data} or {}}};
     $data = {map { $_ => $data->{$_} }
@@ -70,9 +71,10 @@ sub request {
       $qs .= '&api_sig=' . hmac_sha1_hex $time, $self->private_key;
     }
 
-    if ($args{method} and $args{method} eq 'POST') {
+    if ($method eq 'POST' or $method eq 'PUT') {
         my ($req, $res) = http_post_data
             url => $self->base_url . $args{path},
+            override_method => $method,
             header_fields => {
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/x-www-form-urlencoded',
@@ -86,6 +88,7 @@ sub request {
     } else {
         my ($req, $res) = http_get
             url => $self->base_url . $args{path} . q<?> . $qs,
+            override_method => $method,
             header_fields => {
                 'Accept' => 'application/json',
             };
@@ -169,10 +172,9 @@ sub job_post {
 sub job_revise ($$%) {
   my ($self, $job_id, %args) = @_;
   return $self->request
-      (method => 'POST',
+      (method => 'PUT',
        path => q<translate/job/> . $job_id,
        data => {
-           _method => 'put',
            action => 'revise',
            comment => $args{comment_to_translator},
        });
@@ -182,10 +184,9 @@ sub job_revise ($$%) {
 sub job_approve ($$%) {
   my ($self, $job_id, %args) = @_;
   return $self->request
-      (method => 'POST',
+      (method => 'PUT',
        path => q<translate/job/> . $job_id,
        data => {
-           _method => 'put',
            action => 'approve',
            rating => $args{rating},
            for_translator => $args{comment_for_translator},
@@ -198,16 +199,23 @@ sub job_approve ($$%) {
 sub job_reject ($$%) {
   my ($self, $job_id, %args) = @_;
   return $self->request
-      (method => 'POST',
+      (method => 'PUT',
        path => q<translate/job/> . $job_id,
        data => {
-           _method => 'put',
            action => 'reject',
            reason => $args{reason}, # "quality", "incomplete", "other"
            comment => $args{comment_for_translator},
            captcha => $args{captcha},
            follow_up => $args{follow_up}, # requeue / cancel
        });
+}
+
+## <http://mygengo.com/api/developer-docs/methods/translate-job-id-delete/>.
+sub job_delete ($$%) {
+  my ($self, $job_id, %args) = @_;
+  return $self->request
+      (method => 'DELETE',
+       path => q<translate/job/> . $job_id);
 }
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-get/>.
