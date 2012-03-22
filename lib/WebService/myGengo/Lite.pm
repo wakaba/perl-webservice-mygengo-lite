@@ -51,8 +51,9 @@ sub request {
     my $time = time;
 
     my $params = {
+        %$data, ## for GET
         api_key => $self->api_key,
-        data => perl2json_bytes($data),
+        data => perl2json_bytes($data), ## for POST
         ts => $time,
     };
     my $qs = join '&', map {
