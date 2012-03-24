@@ -349,7 +349,9 @@ sub new_from_json_job {
     $job->{source}->{lang} = delete $job->{lc_src};
     
     $job->{target}->{lang} = delete $job->{lc_tgt};
+    $job->{target}->{body} = delete $job->{body_tgt};
     $job->{target}->{preview_image_url} = delete $job->{preview_url};
+    $job->{target}->{is_machine_translation} = delete $job->{mt};
     
     $job->{quote}->{unit_count} = delete $job->{unit_count};
     $job->{quote}->{eta} = delete $job->{eta};
