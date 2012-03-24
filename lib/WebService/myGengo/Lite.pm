@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Digest::SHA qw(hmac_sha1_hex);
 use Web::UserAgent::Functions qw(http_get http_post_data);
-use JSON::Functions::XS qw(json_bytes2perl perl2json_bytes);
+use JSON::Functions::XS qw(json_bytes2perl perl2json_chars);
 use Encode;
 use URL::PercentEncode;
 
@@ -59,7 +59,7 @@ sub request {
     my $params = {
         %$data, ## for GET
         api_key => $self->api_key,
-        data => perl2json_bytes($data), ## for POST
+        data => perl2json_chars($data), ## for POST
         ts => $time,
     };
     my $qs = join '&', map {
