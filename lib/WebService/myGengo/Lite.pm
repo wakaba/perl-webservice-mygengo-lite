@@ -299,6 +299,26 @@ sub job_preview ($$%) {
       (path => q<translate/job/> . $job_id . q</preview>);
 }
 
+sub job_preview_url ($$) {
+  my ($self, $job_id) = @_;
+
+  my $time = time;
+  my $params = {
+    api_key => $self->api_key,
+    ts => $time,
+  };
+  my $qs = join '&', map {
+    (percent_encode_c $_ ) . '=' . (percent_encode_c $params->{$_});
+  } sort { $a cmp $b } keys %$params;
+  if ($APIVersion eq '1') {
+    $qs .= '&api_sig=' . hmac_sha1_hex $qs, $self->private_key;
+  } else { # 1.1
+    $qs .= '&api_sig=' . hmac_sha1_hex $time, $self->private_key;
+  }
+
+  return $self->base_url . q<translate/job/> . $job_id . q</preview?> . $qs,
+} # job_preview_url
+
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-revisions-get/>.
 #
 # $res->data = {revisions => [{ctime => time, rev_id => ...}, ...]}
@@ -433,7 +453,8 @@ sub new_from_lwp_res ($$;%) {
              ref $result->{data}->{jobs} eq 'ARRAY') {
         $result->{jobs} = [map {
           my $j = ref $_ eq 'ARRAY' ? $_->[0] :
-                  ref $_ eq 'HASH' ? $_->{keys %$_} : {};
+                  ref $_ eq 'HASH' ? $_->{job_id}
+                      ? $_ : $_->{keys %$_} : {};
           WebService::myGengo::Lite::Job->new_from_json_job($j);
         } @{$result->{data}->{jobs}}];
     } elsif ($result->{data} and ref $result->{data} eq 'HASH' and
@@ -461,6 +482,11 @@ sub image_as_data_url {
     }
     return undef;
 }
+
+sub image_as_bytes ($) {
+  my $self = shift;
+  return $self->{jpeg_data};
+} # image_as_bytes
 
 sub is_error {
     return $_[0]->{is_error};
