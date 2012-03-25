@@ -261,9 +261,9 @@ sub job_quote {
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-comments-get/>.
 #
-# $res->data = {threads = [{ctime => time, body => ...,
-#                           author => "translator"/"customer"/"worker"/
-#                                     "senior translator"}, ...]}
+# $res->data = {thread = [{ctime => time, body => ...,
+#                          author => "translator"/"customer"/"worker"/
+#                                    "senior translator"}, ...]}
 sub job_comments {
   my ($self, $job_id, %args) = @_;
   return $self->request
