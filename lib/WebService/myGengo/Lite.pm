@@ -361,6 +361,19 @@ sub job_group {
        path => q<translate/jobs/group/> . $job_group_id);
 } # job_group
 
+## <http://mygengo.com/api/developer-docs/callback-urls/>.
+##
+## comment->{ctime} is "2012-03-26 14:27:18" format...
+sub receive_callback ($%) {
+  my ($self, %args) = @_;
+  return bless {
+    data => {
+      job => json_bytes2perl ($args{job} || 'null'),
+      comment => json_bytes2perl ($args{comment} || 'null'),
+    },
+  }, 'WebService::myGengo::Lite::Response';
+} # receive_callback
+
 package WebService::myGengo::Lite::Job;
 
 ## <http://mygengo.com/api/developer-docs/payloads/>.
