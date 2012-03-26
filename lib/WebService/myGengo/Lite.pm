@@ -164,6 +164,9 @@ sub create_job_request ($%) {
 } # create_job_request
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-jobs-post/>.
+#
+# $res->data->{jobs} = [...]
+# $res->data->{group_id} = ...
 sub job_post {
   my ($self, $jobs, %args) = @_;
   return $self->request
@@ -285,7 +288,7 @@ sub job_comment_post ($$%) {
 
 ## <http://mygengo.com/api/developer-docs/methods/translate-job-id-feedback-get/>.
 #
-# $res->data = {for_translator => ..., rating => ...}
+# $res->data->{feedback} = {for_translator => ..., rating => ...}
 sub job_feedback ($$;%) {
   my ($self, $job_id, %args) = @_;
   return $self->request
