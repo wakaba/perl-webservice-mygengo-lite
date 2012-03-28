@@ -470,7 +470,7 @@ sub new_from_lwp_res ($$;%) {
         $result->{jobs} = [map {
           my $j = ref $_ eq 'ARRAY' ? $_->[0] :
                   ref $_ eq 'HASH' ? $_->{job_id}
-                      ? $_ : $_->{keys %$_} : {};
+                      ? $_ : $_->{[keys %$_]->[0]} : {};
           WebService::myGengo::Lite::Job->new_from_json_job($j);
         } @{$result->{data}->{jobs}}];
     } elsif ($result->{data} and ref $result->{data} eq 'HASH' and
