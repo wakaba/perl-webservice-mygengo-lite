@@ -25,9 +25,9 @@ our $APITimeout = 60;
 sub base_url {
     my $self = shift;
     if ($self->is_production) {
-        return qq<http://api.mygengo.com/v$APIVersion/>;
+        return qq<http://api.gengo.com/v$APIVersion/>;
     } else {
-        return qq<http://api.sandbox.mygengo.com/v$APIVersion/>;
+        return qq<http://api.sandbox.gengo.com/v$APIVersion/>;
     }
 }
 
